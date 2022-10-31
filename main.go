@@ -8,7 +8,6 @@ import (
 	"io/ioutil"
 	"log"
 	"os"
-	"strings"
 
 	"github.com/google/tink/go/aead"
 	"github.com/google/tink/go/core/registry"
@@ -55,24 +54,7 @@ var associatedData string
 var mode string
 
 func init() {
-	// iterate all templates.
-	ts := make([]string, 0, len(templates))
-	for k := range templates {
-		ts = append(ts, k)
-	}
-
-	// read all flags.
-	flag.StringVar(&template, "t", "AES128GCM", "Key templates for aead, can be one of: "+strings.Join(ts, ","))
-	flag.StringVar(&plainTextFile, "p", "", "Platin text file path to be encrypted/decrypted")
-	flag.StringVar(&cipherTextFile, "c", "", "Cipher text file path to be encrypted/decrypted")
-	flag.StringVar(&keyFile, "k", "", "Stored DEK that is encrypted by KEK in KMS")
-	flag.StringVar(&keyURI, "u", "", "kms key uri, can only be started with gcp-kms://")
-	flag.StringVar(&credentials, "s", "", "cerdential file for accessing kms")
-	flag.StringVar(&associatedData, "a", "", "associated data to be encrypted/decrypted")
-	flag.StringVar(&mode, "m", "", "mode configuration, can be one of 'encrypt', 'decrypt' or 'newkey'")
-}
-
-func main() {
+	// modify the default usage text.
 	originalUsage := flag.Usage
 	flag.Usage = func() {
 		fmt.Println(`Usage Examples:
@@ -89,10 +71,24 @@ func main() {
   tink-aead-cli -m decrypt -p plainTextFile -c cipherTextFile -k keyFile -s credentials.json -u gcp-kms://xxx
 
 5. Create a data encryption key (DEK). (DEK will be stored in a separate file)
-  tink-aead-cli -m newkey -k keyFile -s credentials.json -u gcp-kms://xxx`)
+  tink-aead-cli -m newkey -k keyFile -s credentials.json -u gcp-kms://xxx
+`)
 
 		originalUsage()
 	}
+
+	// read all flags.
+	flag.StringVar(&template, "t", "AES128GCM", "Key template for aead or streaming_aead")
+	flag.StringVar(&plainTextFile, "p", "", "Platin text file path to be encrypted/decrypted")
+	flag.StringVar(&cipherTextFile, "c", "", "Cipher text file path to be encrypted/decrypted")
+	flag.StringVar(&keyFile, "k", "", "Stored DEK that is encrypted by KEK in KMS")
+	flag.StringVar(&keyURI, "u", "", "kms key uri, can only be started with gcp-kms://")
+	flag.StringVar(&credentials, "s", "", "cerdential file for accessing kms")
+	flag.StringVar(&associatedData, "a", "", "associated data to be encrypted/decrypted")
+	flag.StringVar(&mode, "m", "", "mode configuration, can be one of 'encrypt', 'decrypt' or 'newkey'")
+}
+
+func main() {
 	flag.Parse()
 
 	// validate input arguments.

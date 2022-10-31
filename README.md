@@ -23,6 +23,10 @@ Usage of tink-aead-cli:
     kms key uri, can only be started with gcp-kms://
 ```
 
+## Templates
+Non-Streaming: AES128CTRHMACSHA256,AES128GCM,AES256CTRHMACSHA256,AES256GCMNoPrefix,ChaCha20Poly1305
+Streaming: AES128CTRHMACSHA256,AES128GCM,AES256CTRHMACSHA256,AES256GCMNoPrefix,ChaCha20Poly1305
+
 ## Examples:
 
 1. Encrypt plain text file by envelope encryption (DEK is stored in output cipher text file)
