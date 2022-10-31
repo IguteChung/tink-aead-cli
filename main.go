@@ -73,6 +73,26 @@ func init() {
 }
 
 func main() {
+	originalUsage := flag.Usage
+	flag.Usage = func() {
+		fmt.Println(`Usage Examples:
+1. Encrypt plain text file by envelope encryption (DEK is stored in output cipher text file)
+  tink-aead-cli -m encrypt -p plainTextFile -c cipherTextFile -s credentials.json -u gcp-kms://xxx
+
+2. Decrypt cipher text file by envelope encryption (DEK is stored in input cipher text file)
+  tink-aead-cli -m decrypt -p plainTextFile -c cipherTextFile -s credentials.json -u gcp-kms://xxx
+
+3. Encrypt plain text file by stored keyset. (DEK is stored in a separate file)
+  tink-aead-cli -m encrypt -p plainTextFile -c cipherTextFile -k keyFile -s credentials.json -u gcp-kms://xxx
+
+4. Decrypt cipher text file by stored keyset. (DEK is stored in a separate file)
+  tink-aead-cli -m decrypt -p plainTextFile -c cipherTextFile -k keyFile -s credentials.json -u gcp-kms://xxx
+
+5. Create a data encryption key (DEK). (DEK will be stored in a separate file)
+  tink-aead-cli -m newkey -k keyFile -s credentials.json -u gcp-kms://xxx`)
+
+		originalUsage()
+	}
 	flag.Parse()
 
 	// validate input arguments.
@@ -105,14 +125,16 @@ func checkArgs() (t keyTemplate, isStream bool, err error) {
 		return nil, false, errors.New("missing kms credentials file")
 	}
 
-	// check files.
-	if plainTextFile == "" || cipherTextFile == "" {
-		return nil, false, errors.New("missing plainTextFile or cipherTextFile")
-	}
-
 	// check mode.
 	if mode == "" || (mode != string(modeEncrypt) && mode != string(modeDecrypt) && mode != string(modeNewKey)) {
 		return nil, false, fmt.Errorf("mode %s should be one of 'encrypt', 'decrypt' or 'newkey'", mode)
+	}
+
+	// check files.
+	if mode != string(modeNewKey) && (plainTextFile == "" || cipherTextFile == "") {
+		return nil, false, errors.New("missing plainTextFile or cipherTextFile")
+	} else if mode == string(modeNewKey) && keyFile == "" {
+		return nil, false, errors.New("missing key file")
 	}
 
 	return
@@ -158,7 +180,7 @@ func process(template keyTemplate, isStream bool) error {
 		// generate aead stream for encrypt/decrypt.
 		a, err := streamingaead.New(kh)
 		if err != nil {
-			return fmt.Errorf("failed to new key for aead: %v", err)
+			return fmt.Errorf("failed to new key for streamingaead: %v", err)
 		}
 
 		// determine to encrypt or decrypt.
@@ -178,14 +200,14 @@ func process(template keyTemplate, isStream bool) error {
 
 func decryptKey(gcpClient registry.KMSClient, template keyTemplate, isStream bool) (*keyset.Handle, error) {
 	if keyFile == "" {
+		// streaming aead does not support envelope encryption.
+		if isStream {
+			return nil, errors.New("streamingAEAD does not support envelope encryption")
+		}
+
 		// no key file specified, use envelope encryption.
 		dekTemplate := template()
 		return keyset.NewHandle(aead.KMSEnvelopeAEADKeyTemplate(keyURI, dekTemplate))
-	}
-
-	// streaming aead does not support envelope encryption.
-	if isStream {
-		return nil, errors.New("streamingAEAD does not support envelope encryption")
 	}
 
 	// key file specified, use master key in KMS.
@@ -205,11 +227,6 @@ func decryptKey(gcpClient registry.KMSClient, template keyTemplate, isStream boo
 }
 
 func encryptKey(gcpClient registry.KMSClient, template keyTemplate) error {
-	if keyFile == "" {
-		// no key file specified.
-		return errors.New("missing key file for new key")
-	}
-
 	// key file specified, use master key in KMS.
 	masterKey, err := gcpClient.GetAEAD(keyURI)
 	if err != nil {
