@@ -53,3 +53,9 @@ tink-aead-cli -m decrypt -p plainTextFile -c cipherTextFile -k keyFile -s creden
 ```sh
 tink-aead-cli -m newkey -k keyFile -s credentials.json -u gcp-kms://xxx
 ```
+
+# Build from source
+
+```sh
+./build.sh
+```
