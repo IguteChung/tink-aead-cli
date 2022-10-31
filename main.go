@@ -71,8 +71,7 @@ func init() {
   tink-aead-cli -m decrypt -p plainTextFile -c cipherTextFile -k keyFile -s credentials.json -u gcp-kms://xxx
 
 5. Create a data encryption key (DEK). (DEK will be stored in a separate file)
-  tink-aead-cli -m newkey -k keyFile -s credentials.json -u gcp-kms://xxx
-`)
+  tink-aead-cli -m newkey -k keyFile -s credentials.json -u gcp-kms://xxx`)
 
 		originalUsage()
 	}
