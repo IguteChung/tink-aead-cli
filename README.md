@@ -3,6 +3,10 @@ An implementation of Google Tink CLI for AEAD encryption based on Tink-Golang
 
 ## Version: v0.0.1
 
+## Download Binary
+
+Download pre-build binary from [Release Page](https://github.com/IguteChung/tink-aead-cli/releases).
+
 ## Usage:
 
 ```sh
