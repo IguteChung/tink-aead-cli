@@ -1,5 +1,7 @@
 package tinkaeadcli
 
+import "fmt"
+
 // KeyTemplate defines the template for tink.
 type KeyTemplate string
 
@@ -14,4 +16,15 @@ type Config struct {
 	Credentials string
 	// KeyFile for local DEK encryption, optional.
 	KeyFile string
+}
+
+// IsStream indicates whether the template is for streaming.
+func (t KeyTemplate) IsStream() (bool, error) {
+	if _, ok := validTemplate[t]; ok {
+		return false, nil
+	}
+	if _, ok := validStreamTemplate[t]; ok {
+		return true, nil
+	}
+	return false, fmt.Errorf("invalid key template %s", t)
 }

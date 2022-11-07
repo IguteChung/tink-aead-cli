@@ -20,6 +20,7 @@ type StreamEncrypterDecrypter interface {
 	Decrypt(src io.Reader, dst io.Writer, ad []byte) error
 
 	// NewDataKey cretes a new local DEK that will be encrypted remotely and stored in local KeyFile.
+	// Use remote KEK to encrypt the DEK.
 	NewDataKey(keypath string) error
 }
 

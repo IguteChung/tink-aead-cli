@@ -18,8 +18,7 @@ import (
 
 type impl struct {
 	template  func() *tinkpb.KeyTemplate
-	gcpClient registry.KMSClient
-	keyHandle *keyset.Handle
+	masterKey tink.AEAD
 	isStream  bool
 	a         tink.AEAD
 	as        tink.StreamingAEAD
@@ -123,7 +122,12 @@ func (i *impl) NewDataKey(keypath string) error {
 	w := keyset.NewJSONWriter(file)
 
 	// generate a new key.
-	if err := i.keyHandle.Write(w, i.a); err != nil {
+	kh, err := keyset.NewHandle(i.template())
+	if err != nil {
+		return fmt.Errorf("failed to new key handle: %v", err)
+	}
+
+	if err := kh.Write(w, i.masterKey); err != nil {
 		return fmt.Errorf("failed to write key file: %v", err)
 	}
 
@@ -132,7 +136,11 @@ func (i *impl) NewDataKey(keypath string) error {
 
 func newImpl(config Config, isStream bool) (*impl, error) {
 	// find template from config.
-	template, ok := validTemplate[config.Template]
+	templates := validTemplate
+	if isStream {
+		templates = validStreamTemplate
+	}
+	template, ok := templates[config.Template]
 	if !ok {
 		return nil, fmt.Errorf("failed to find template %s", config.Template)
 	}
@@ -151,13 +159,23 @@ func newImpl(config Config, isStream bool) (*impl, error) {
 	}
 	registry.RegisterKMSClient(gcpClient)
 
+	// get remote master key.
+	masterKey, err := gcpClient.GetAEAD(config.KeyURI)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get key %s from KMS: %v", config.KeyURI, err)
+	}
+
 	// initialize the keyset handle for encrypt/decrypt.
 	var a tink.AEAD
 	var as tink.StreamingAEAD
 	if config.KeyFile == "" {
 		// streaming aead does not support envelope encryption.
 		if isStream {
-			return nil, errors.New("streamingAEAD does not support envelope encryption")
+			return &impl{
+				template:  template,
+				masterKey: masterKey,
+				isStream:  isStream,
+			}, nil
 		}
 
 		// no key file specified, use envelope encryption.
@@ -172,12 +190,6 @@ func newImpl(config Config, isStream bool) (*impl, error) {
 			return nil, fmt.Errorf("failed to new aead handler: %v", err)
 		}
 	} else {
-		// key file specified, use master key in KMS to decrypt the local key.
-		masterKey, err := gcpClient.GetAEAD(config.KeyURI)
-		if err != nil {
-			return nil, fmt.Errorf("failed to get key %s from KMS: %v", config.KeyURI, err)
-		}
-
 		// read from key file.
 		file, err := os.Open(config.KeyFile)
 		if err != nil {
@@ -190,15 +202,21 @@ func newImpl(config Config, isStream bool) (*impl, error) {
 			return nil, fmt.Errorf("failed to parse key file %s: %v", config.KeyFile, err)
 		}
 
-		// create the streaming aead handler.
-		if as, err = streamingaead.New(keyHandle); err != nil {
-			return nil, fmt.Errorf("failed to new streaming aead handler: %v", err)
+		// create the aead or streaming handler.
+		if isStream {
+			if as, err = streamingaead.New(keyHandle); err != nil {
+				return nil, fmt.Errorf("failed to new streaming aead handler: %v", err)
+			}
+		} else {
+			if a, err = aead.New(keyHandle); err != nil {
+				return nil, fmt.Errorf("failed to new aead handler: %v", err)
+			}
 		}
 	}
 
 	return &impl{
 		template:  template,
-		gcpClient: gcpClient,
+		masterKey: masterKey,
 		isStream:  isStream,
 		a:         a,
 		as:        as,

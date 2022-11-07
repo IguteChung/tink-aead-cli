@@ -18,7 +18,7 @@ type EncrypterDecrypter interface {
 	DecryptFile(src, dst string, ad []byte) error
 
 	// NewDataKey cretes a new local DEK that will be encrypted.
-	// Use remote encryption if KeyFile is not provided, otherwise use KeyFile for local encryption.
+	// Use remote KEK to encrypt the DEK.
 	NewDataKey(keypath string) error
 }
 
